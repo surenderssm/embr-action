@@ -93,8 +93,8 @@ async function createBuild(apiBaseUrl, projectId, branch, commitSha) {
  */
 async function pollBuildStatus(apiBaseUrl, projectId, buildId) {
   const endpoint = `${apiBaseUrl}/projects/${projectId}/builds/${buildId}`;
-  const pollingInterval = 15; // seconds
-  const maxAttempts = 60; // 15 minutes max
+  const pollingInterval = 10; // seconds
+  const maxAttempts = 60; // 10 minutes max
   
   core.info(`Polling build status at: ${endpoint}`);
   core.info(`Navigate to see live build logs: ${UI_BASE_URL}/builds/${projectId}/${buildId}`);
