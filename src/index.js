@@ -94,7 +94,7 @@ async function pollBuildStatus(apiBaseUrl, projectId, buildId) {
   const maxAttempts = 60; // 10 minutes max
   
   core.info(`Polling build status at: ${endpoint}`);
-  core.info(`Build Logs: https://embr-poc-ui.azurewebsites.net/builds/${projectId}/${buildId}`);
+  core.info(`Navigate to see live build logs: https://embr-poc-ui.azurewebsites.net/builds/${projectId}/${buildId}`);
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
