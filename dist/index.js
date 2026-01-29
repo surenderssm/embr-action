@@ -40497,6 +40497,9 @@ const core = __nccwpck_require__(7484);
 const github = __nccwpck_require__(3228);
 const axios = __nccwpck_require__(7269);
 
+const API_BASE_URL = 'https://embr-poc.azurewebsites.net/api';
+const UI_BASE_URL = 'https://embr-poc-ui.azurewebsites.net';
+
 /**
  * Sleep for a specified number of milliseconds
  */
@@ -40585,11 +40588,11 @@ async function createBuild(apiBaseUrl, projectId, branch, commitSha) {
  */
 async function pollBuildStatus(apiBaseUrl, projectId, buildId) {
   const endpoint = `${apiBaseUrl}/projects/${projectId}/builds/${buildId}`;
-  const pollingInterval = 10; // seconds
-  const maxAttempts = 60; // 10 minutes max
+  const pollingInterval = 15; // seconds
+  const maxAttempts = 60; // 15 minutes max
   
   core.info(`Polling build status at: ${endpoint}`);
-  core.info(`Navigate to see live build logs: https://embr-poc-ui.azurewebsites.net/builds/${projectId}/${buildId}`);
+  core.info(`Navigate to see live build logs: ${UI_BASE_URL}/builds/${projectId}/${buildId}`);
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -40650,7 +40653,8 @@ async function run() {
   try {
     // Get inputs
     const projectId = core.getInput('project-id', { required: true });
-    const apiBaseUrl = 'https://embr-poc.azurewebsites.net/api';
+    
+    const buildLogsUrl = (buildId) => `${UI_BASE_URL}/builds/${projectId}/${buildId}`;
     
     core.info('='.repeat(50));
     core.info('🔥 Welcome to Embr!');
@@ -40684,7 +40688,7 @@ async function run() {
     core.info('Creating build');
     core.info('='.repeat(50));
     const buildResponse = await createBuild(
-      apiBaseUrl,
+      API_BASE_URL,
       projectId,
       branchName,
       repoContext.commit
@@ -40705,7 +40709,7 @@ async function run() {
     core.info('Waiting for build to complete...');
     core.info('='.repeat(50));
     
-    const result = await pollBuildStatus(apiBaseUrl, projectId, buildId);
+    const result = await pollBuildStatus(API_BASE_URL, projectId, buildId);
     
     // Set outputs
     core.info('='.repeat(50));
@@ -40718,7 +40722,7 @@ async function run() {
       core.info('='.repeat(50));
       core.info(`Build Number: ${build.buildNumber}`);
       core.info(`Duration: ${build.durationSeconds?.toFixed(1)}s`);
-      core.info(`Build Logs: https://embr-poc-ui.azurewebsites.net/builds/${projectId}/${buildId}`);
+      core.info(`Build Logs: ${buildLogsUrl(buildId)}`);
       
       if (deployment?.url) {
         core.info('='.repeat(50));
@@ -40731,7 +40735,7 @@ async function run() {
       core.setOutput('status', 'succeeded');
       core.setOutput('build-id', buildId);
       core.setOutput('build-number', build.buildNumber);
-      core.setOutput('log-path', `https://embr-poc-ui.azurewebsites.net/builds/${projectId}/${buildId}`);
+      core.setOutput('log-path', buildLogsUrl(buildId));
       core.setOutput('response', JSON.stringify(result.data));
       
     } else if (result.timeout) {
