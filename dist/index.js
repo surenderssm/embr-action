@@ -40554,8 +40554,8 @@ async function createBuild(apiBaseUrl, projectId, branch, commitSha, timeout) {
     core.info(`Commit SHA: ${commitSha}`);
     
     const response = await axios.post(endpoint, {
-      branch: branch,
-      commitSha: commitSha
+      branch,
+      commitSha
     }, {
       timeout: timeout,
       headers: {
@@ -40688,10 +40688,12 @@ async function run() {
     
     // Determine branch name to use
     let branchName = repoContext.branch || repoContext.ref;
-    if (!branchName || branchName === 'unknown') {
-      core.warning('Could not determine branch name, using commit SHA as fallback');
+    if (!branchName || branchName === 'unknown' || repoContext.refType === 'unknown') {
+      core.warning('Could not determine branch name from context, using commit SHA as fallback');
       branchName = repoContext.commit;
     }
+    
+    core.info(`Using branch name: ${branchName}`);
     
     // Create build
     core.info('='.repeat(50));
@@ -40708,15 +40710,29 @@ async function run() {
     // Check if build response includes an ID for polling
     let buildId = buildResponse.id || buildResponse.buildId || buildResponse.build_id;
     
-    if (!buildId) {
-      core.info('No build ID returned, setting outputs and completing');
+    if (buildId) {
+      core.info(`Build created with ID: ${buildId}`);
+    } else {
+      core.info('No build ID returned in response');
+      
+      // Check if the response indicates immediate success
+      if (buildResponse.status === 'completed' || 
+          buildResponse.status === 'success' || 
+          buildResponse.status === 'succeeded' ||
+          buildResponse.complete === true) {
+        core.info('Build completed immediately (no polling needed)');
+        core.setOutput('status', 'completed');
+        core.setOutput('response', JSON.stringify(buildResponse));
+        core.info('Action completed successfully!');
+        return;
+      }
+      
+      // No build ID and not immediately successful - treat as completed but log warning
+      core.warning('Build response does not contain an ID or clear success status. Assuming completed.');
       core.setOutput('status', 'completed');
       core.setOutput('response', JSON.stringify(buildResponse));
-      core.info('Action completed successfully!');
       return;
     }
-    
-    core.info(`Build created with ID: ${buildId}`);
     
     // Check if build completed immediately
     if (buildResponse.status === 'completed' || 

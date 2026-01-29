@@ -1,5 +1,5 @@
 name: 'Embr Action'
-description: 'GitHub Action that calls an endpoint and polls for completion with repository context'
+description: 'GitHub Action that creates Embr builds with auto-captured branch and commit information'
 author: 'surenderssm'
 
 inputs:
@@ -25,9 +25,9 @@ inputs:
 
 outputs:
   status:
-    description: 'Status of the task execution'
+    description: 'Status of the build execution'
   response:
-    description: 'Response from the endpoint'
+    description: 'Response from the Embr API'
 
 runs:
   using: 'node20'
