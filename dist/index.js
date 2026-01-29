@@ -40717,7 +40717,7 @@ async function run() {
       core.info('='.repeat(50));
       core.info(`Build Number: ${build.buildNumber}`);
       core.info(`Duration: ${build.durationSeconds?.toFixed(1)}s`);
-      core.info(`Build Logs: ${build.logPath}`);
+      core.info(`Build Logs: https://embr-poc-ui.azurewebsites.net/builds/${projectId}/${buildId}`);
       
       if (deployment?.url) {
         core.info('='.repeat(50));
@@ -40730,7 +40730,7 @@ async function run() {
       core.setOutput('status', 'succeeded');
       core.setOutput('build-id', buildId);
       core.setOutput('build-number', build.buildNumber);
-      core.setOutput('log-path', build.logPath);
+      core.setOutput('log-path', `https://embr-poc-ui.azurewebsites.net/builds/${projectId}/${buildId}`);
       core.setOutput('response', JSON.stringify(result.data));
       
     } else if (result.timeout) {
