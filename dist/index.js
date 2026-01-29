@@ -40498,6 +40498,13 @@ const github = __nccwpck_require__(3228);
 const axios = __nccwpck_require__(7269);
 
 /**
+ * Sleep for a specified number of milliseconds
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Get repository context information
  */
 function getRepositoryContext() {
@@ -40551,14 +40558,13 @@ async function createBuild(apiBaseUrl, projectId, branch, commitSha) {
       commitSha
     }, {
       headers: {
-        'accept': 'text/plain',
+        'accept': 'application/json',
         'Content-Type': 'application/json',
         'User-Agent': 'embr-action'
       }
     });
     
     core.info(`Response status: ${response.status}`);
-    core.info(`Response data: ${JSON.stringify(response.data)}`);
     
     return response.data;
   } catch (error) {
@@ -40575,13 +40581,75 @@ async function createBuild(apiBaseUrl, projectId, branch, commitSha) {
 }
 
 /**
+ * Poll the build status endpoint until completion
+ */
+async function pollBuildStatus(apiBaseUrl, projectId, buildId) {
+  const endpoint = `${apiBaseUrl}/projects/${projectId}/builds/${buildId}`;
+  const pollingInterval = 10; // seconds
+  const maxAttempts = 60; // 10 minutes max
+  
+  core.info(`Polling build status at: ${endpoint}`);
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      core.info(`Polling attempt ${attempt}/${maxAttempts}...`);
+      
+      const response = await axios.get(endpoint, {
+        headers: {
+          'accept': 'application/json',
+          'User-Agent': 'embr-action'
+        }
+      });
+      
+      const build = response.data.build;
+      const status = build.status;
+      
+      core.info(`Build status: ${status}`);
+      
+      // Check if build is complete
+      if (status === 'Succeeded' || status === 'completed' || status === 'success') {
+        return {
+          success: true,
+          data: response.data
+        };
+      }
+      
+      // Check if build has failed
+      if (status === 'Failed' || status === 'failed' || status === 'error') {
+        return {
+          success: false,
+          data: response.data
+        };
+      }
+      
+      // Still in progress, wait and retry
+      await sleep(pollingInterval * 1000);
+      
+    } catch (error) {
+      core.warning(`Polling attempt ${attempt} failed: ${error.message}`);
+      if (attempt < maxAttempts) {
+        await sleep(pollingInterval * 1000);
+      }
+    }
+  }
+  
+  // Timeout
+  core.warning('Build polling timed out');
+  return {
+    success: false,
+    data: null,
+    timeout: true
+  };
+}
+
+/**
  * Main action entry point
  */
 async function run() {
   try {
     // Get inputs
     const projectId = core.getInput('project-id', { required: true });
-    const apiBaseUrl = core.getInput('api-base-url') || 'https://embr-poc.azurewebsites.net/api';
+    const apiBaseUrl = 'https://embr-poc.azurewebsites.net/api';
     
     core.info('='.repeat(50));
     core.info('🔥 Welcome to Embr!');
@@ -40621,12 +40689,65 @@ async function run() {
       repoContext.commit
     );
     
-    // Set outputs
-    core.setOutput('status', 'completed');
-    core.setOutput('response', JSON.stringify(buildResponse));
+    // Extract build ID
+    const buildId = buildResponse.build?.id;
+    if (!buildId) {
+      throw new Error('No build ID returned from API');
+    }
     
+    core.info(`Build created with ID: ${buildId}`);
+    core.info(`Build Number: ${buildResponse.build?.buildNumber}`);
+    core.info(`Status: ${buildResponse.build?.status}`);
+    
+    // Poll for build completion
     core.info('='.repeat(50));
-    core.info('Action completed successfully!');
+    core.info('Waiting for build to complete...');
+    core.info('='.repeat(50));
+    
+    const result = await pollBuildStatus(apiBaseUrl, projectId, buildId);
+    
+    // Set outputs
+    core.info('='.repeat(50));
+    
+    if (result.success && result.data) {
+      const build = result.data.build;
+      const deployment = result.data.deployment;
+      
+      core.info('✅ Build completed successfully!');
+      core.info('='.repeat(50));
+      core.info(`Build Number: ${build.buildNumber}`);
+      core.info(`Duration: ${build.durationSeconds?.toFixed(1)}s`);
+      core.info(`Build Logs: ${build.logPath}`);
+      
+      if (deployment?.url) {
+        core.info('='.repeat(50));
+        core.info('🚀 Deployment');
+        core.info(`Deployed Site: ${deployment.url}`);
+        core.info(`Status: ${deployment.status}`);
+        core.setOutput('deployment-url', deployment.url);
+      }
+      
+      core.setOutput('status', 'succeeded');
+      core.setOutput('build-id', buildId);
+      core.setOutput('build-number', build.buildNumber);
+      core.setOutput('log-path', build.logPath);
+      core.setOutput('response', JSON.stringify(result.data));
+      
+    } else if (result.timeout) {
+      core.setOutput('status', 'timeout');
+      core.setFailed('Build timed out');
+    } else {
+      const build = result.data?.build;
+      core.error('❌ Build failed');
+      if (build?.statusMessage) {
+        core.error(`Message: ${build.statusMessage}`);
+      }
+      core.setOutput('status', 'failed');
+      core.setOutput('build-id', buildId);
+      core.setOutput('response', JSON.stringify(result.data));
+      core.setFailed('Build failed');
+    }
+    
     core.info('='.repeat(50));
     
   } catch (error) {
