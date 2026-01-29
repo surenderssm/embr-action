@@ -6,10 +6,10 @@ A GitHub Action that creates Embr builds with automatically captured branch and 
 
 - 🎯 **Simple Configuration**: Only requires project ID - branch and commit are auto-captured
 - 📡 **Embr API Integration**: Directly integrates with Embr build API
-- 🔄 **Automatic Polling**: Continuously polls for build completion status
+- 🔄 **Automatic Polling**: Continuously polls for build completion status (10 min max)
 - 📊 **Rich Context**: Automatically captures branch name and commit SHA from GitHub
-- ⚙️ **Configurable**: Customizable polling interval, retry limits, and timeouts
-- 🎯 **Smart Status Detection**: Automatically detects completion, failure, or timeout states
+- 🚀 **Deployment Info**: Returns deployment URL when available
+- 🎯 **Smart Status Detection**: Automatically detects success, failure, or timeout states
 
 ## Usage
 
@@ -29,12 +29,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Embr Build
-        uses: surenderssm/embr-action@v1
+        uses: surenderssm/embr-action@main
         with:
-          project-id: 'c53f464b-6c5c-49ec-8212-fc1c26129bac'
+          project-id: 'your-project-id'
 ```
 
-### Advanced Example
+### Using Outputs
 
 ```yaml
 name: Embr Build Workflow
@@ -47,37 +47,36 @@ jobs:
   embr-build:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Embr Build with custom settings
+      - name: Trigger Embr Build
         id: embr
-        uses: surenderssm/embr-action@v1
+        uses: surenderssm/embr-action@main
         with:
-          project-id: 'c53f464b-6c5c-49ec-8212-fc1c26129bac'
-          polling-interval: '15'
-          max-attempts: '20'
-          timeout: '45000'
+          project-id: 'your-project-id'
         
-      - name: Check build result
+      - name: Show build results
         run: |
-          echo "Build Status: ${{ steps.embr.outputs.status }}"
-          echo "Build Response: ${{ steps.embr.outputs.response }}"
+          echo "Status: ${{ steps.embr.outputs.status }}"
+          echo "Build ID: ${{ steps.embr.outputs.build-id }}"
+          echo "Build Number: ${{ steps.embr.outputs.build-number }}"
+          echo "Deployment URL: ${{ steps.embr.outputs.deployment-url }}"
 ```
 
 ## Inputs
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `project-id` | The Embr project ID | Yes | - |
-| `api-base-url` | The API base URL | No | `https://embr-poc.azurewebsites.net/api` |
-| `polling-interval` | Polling interval in seconds | No | `10` |
-| `max-attempts` | Maximum number of polling attempts | No | `30` |
-| `timeout` | Timeout for each HTTP request in milliseconds | No | `30000` |
+| Input | Description | Required |
+|-------|-------------|----------|
+| `project-id` | The Embr project ID | Yes |
 
 ## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `status` | Status of the build execution (`completed`, `failed`, or `timeout`) |
-| `response` | JSON response from the Embr API |
+| `status` | Status of the build (`succeeded`, `failed`, or `timeout`) |
+| `build-id` | The unique build ID |
+| `build-number` | The build number |
+| `log-path` | Path to the build logs |
+| `deployment-url` | URL where the app is deployed |
+| `response` | Full JSON response from the Embr API |
 
 ## How It Works
 
@@ -132,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Dev Build
-        uses: surenderssm/embr-action@v1
+        uses: surenderssm/embr-action@main
         with:
           project-id: 'dev-project-id'
   
@@ -141,7 +140,7 @@ jobs:
     needs: build-dev
     steps:
       - name: Trigger Production Build
-        uses: surenderssm/embr-action@v1
+        uses: surenderssm/embr-action@main
         with:
           project-id: 'prod-project-id'
 ```
