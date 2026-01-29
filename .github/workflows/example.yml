@@ -1,0 +1,30 @@
+name: Example Embr Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  embr-task:
+    runs-on: ubuntu-latest
+    name: Run Embr Action Example
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Run Embr Action
+        id: embr
+        uses: ./
+        with:
+          endpoint: 'https://httpbin.org/post'
+          polling-interval: '5'
+          max-retries: '3'
+          timeout: '10000'
+      
+      - name: Display Results
+        run: |
+          echo "Task Status: ${{ steps.embr.outputs.status }}"
+          echo "Task Response: ${{ steps.embr.outputs.response }}"

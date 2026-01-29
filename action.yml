@@ -1,0 +1,34 @@
+name: 'Embr Action'
+description: 'GitHub Action that calls an endpoint and polls for completion with repository context'
+author: 'surenderssm'
+
+inputs:
+  endpoint:
+    description: 'The endpoint URL to call'
+    required: true
+  polling-interval:
+    description: 'Polling interval in seconds (default: 10)'
+    required: false
+    default: '10'
+  max-retries:
+    description: 'Maximum number of polling attempts (default: 30)'
+    required: false
+    default: '30'
+  timeout:
+    description: 'Timeout for each HTTP request in milliseconds (default: 30000)'
+    required: false
+    default: '30000'
+
+outputs:
+  status:
+    description: 'Status of the task execution'
+  response:
+    description: 'Response from the endpoint'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+branding:
+  icon: 'activity'
+  color: 'orange'
