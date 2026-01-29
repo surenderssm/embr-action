@@ -1,0 +1,27 @@
+{
+  "name": "embr-action",
+  "version": "1.0.0",
+  "description": "GitHub Action that calls an endpoint and polls for completion",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "ncc build src/index.js -o dist",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "github",
+    "action",
+    "embr",
+    "webhook",
+    "polling"
+  ],
+  "author": "surenderssm",
+  "license": "MIT",
+  "dependencies": {
+    "@actions/core": "^1.10.1",
+    "@actions/github": "^6.0.0",
+    "axios": "^1.6.5"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.1"
+  }
+}

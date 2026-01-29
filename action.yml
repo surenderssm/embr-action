@@ -1,0 +1,38 @@
+name: 'Embr Action'
+description: 'GitHub Action that creates Embr builds with auto-captured branch and commit information'
+author: 'surenderssm'
+
+inputs:
+  project-id:
+    description: 'The Embr project ID'
+    required: true
+  api-base-url:
+    description: 'The API base URL (default: https://embr-poc.azurewebsites.net/api)'
+    required: false
+    default: 'https://embr-poc.azurewebsites.net/api'
+  polling-interval:
+    description: 'Polling interval in seconds (default: 10)'
+    required: false
+    default: '10'
+  max-attempts:
+    description: 'Maximum number of polling attempts (default: 30)'
+    required: false
+    default: '30'
+  timeout:
+    description: 'Timeout for each HTTP request in milliseconds (default: 30000)'
+    required: false
+    default: '30000'
+
+outputs:
+  status:
+    description: 'Status of the build execution'
+  response:
+    description: 'Response from the Embr API'
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+branding:
+  icon: 'activity'
+  color: 'orange'

@@ -1,0 +1,29 @@
+name: Example Embr Build Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  embr-build:
+    runs-on: ubuntu-latest
+    name: Trigger Embr Build
+    steps:
+      - name: Trigger Embr Build
+        id: embr
+        uses: ./
+        with:
+          # Replace with your actual project ID
+          project-id: 'c53f464b-6c5c-49ec-8212-fc1c26129bac'
+          polling-interval: '10'
+          max-attempts: '5'
+          timeout: '10000'
+      
+      - name: Display Results
+        if: always()
+        run: |
+          echo "Build Status: ${{ steps.embr.outputs.status }}"
+          echo "Build Response: ${{ steps.embr.outputs.response }}"
