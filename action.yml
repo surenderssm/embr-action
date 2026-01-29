@@ -10,7 +10,7 @@ inputs:
     description: 'Polling interval in seconds (default: 10)'
     required: false
     default: '10'
-  max-retries:
+  max-attempts:
     description: 'Maximum number of polling attempts (default: 30)'
     required: false
     default: '30'

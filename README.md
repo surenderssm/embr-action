@@ -47,11 +47,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run Embr Action with custom settings
+        id: embr
         uses: surenderssm/embr-action@v1
         with:
           endpoint: 'https://api.example.com/task'
           polling-interval: '15'
-          max-retries: '20'
+          max-attempts: '20'
           timeout: '45000'
         
       - name: Check task result
@@ -66,7 +67,7 @@ jobs:
 |-------|-------------|----------|---------|
 | `endpoint` | The endpoint URL to call and poll | Yes | - |
 | `polling-interval` | Polling interval in seconds | No | `10` |
-| `max-retries` | Maximum number of polling attempts | No | `30` |
+| `max-attempts` | Maximum number of polling attempts | No | `30` |
 | `timeout` | Timeout for each HTTP request in milliseconds | No | `30000` |
 
 ## Outputs
@@ -85,7 +86,10 @@ The action automatically captures and sends the following context to your endpoi
   "repository": "embr-action",
   "owner": "surenderssm",
   "fullRepository": "surenderssm/embr-action",
+  "ref": "main",
+  "refType": "branch",
   "branch": "main",
+  "tag": null,
   "commit": "abc123def456...",
   "actor": "username",
   "workflow": "Embr Task Workflow",
@@ -193,7 +197,7 @@ To test the action locally, you can set environment variables and run the script
 
 ```bash
 export INPUT_ENDPOINT="https://api.example.com/task"
-export INPUT_POLLING-INTERVAL="5"
+export INPUT_POLLING_INTERVAL="5"
 export GITHUB_REPOSITORY="owner/repo"
 export GITHUB_REF="refs/heads/main"
 export GITHUB_SHA="abc123"

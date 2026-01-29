@@ -19,12 +19,16 @@ jobs:
         id: embr
         uses: ./
         with:
-          endpoint: 'https://httpbin.org/post'
+          # Note: This example uses httpbin.org which will demonstrate
+          # the initial POST call but polling will timeout since httpbin
+          # doesn't maintain state. Replace with your actual endpoint.
+          endpoint: 'https://httpbin.org/anything'
           polling-interval: '5'
-          max-retries: '3'
+          max-attempts: '3'
           timeout: '10000'
       
       - name: Display Results
+        if: always()
         run: |
           echo "Task Status: ${{ steps.embr.outputs.status }}"
           echo "Task Response: ${{ steps.embr.outputs.response }}"
