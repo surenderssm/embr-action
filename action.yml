@@ -6,16 +6,20 @@ inputs:
   project-id:
     description: 'The Embr project ID'
     required: true
-  api-base-url:
-    description: 'The API base URL (default: https://embr-poc.azurewebsites.net/api)'
-    required: false
-    default: 'https://embr-poc.azurewebsites.net/api'
 
 outputs:
   status:
-    description: 'Status of the build execution'
+    description: 'Status of the build (succeeded, failed, timeout)'
+  build-id:
+    description: 'The unique build ID'
+  build-number:
+    description: 'The build number'
+  log-path:
+    description: 'Path to the build logs'
+  deployment-url:
+    description: 'URL where the app is deployed'
   response:
-    description: 'Response from the Embr API'
+    description: 'Full JSON response from the Embr API'
 
 runs:
   using: 'node20'
