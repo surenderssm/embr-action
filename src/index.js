@@ -89,6 +89,8 @@ async function run() {
     const apiBaseUrl = core.getInput('api-base-url') || 'https://embr-poc.azurewebsites.net/api';
     
     core.info('='.repeat(50));
+    core.info('🔥 Welcome to Embr!');
+    core.info('='.repeat(50));
     core.info('Embr Action Started');
     core.info('='.repeat(50));
     
