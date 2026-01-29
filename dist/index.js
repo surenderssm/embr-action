@@ -40498,13 +40498,6 @@ const github = __nccwpck_require__(3228);
 const axios = __nccwpck_require__(7269);
 
 /**
- * Sleep for a specified number of milliseconds
- */
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
  * Get repository context information
  */
 function getRepositoryContext() {
@@ -40545,7 +40538,7 @@ function getRepositoryContext() {
 /**
  * Call the Embr API to create a build
  */
-async function createBuild(apiBaseUrl, projectId, branch, commitSha, timeout) {
+async function createBuild(apiBaseUrl, projectId, branch, commitSha) {
   try {
     const endpoint = `${apiBaseUrl}/projects/${projectId}/builds`;
     
@@ -40557,7 +40550,6 @@ async function createBuild(apiBaseUrl, projectId, branch, commitSha, timeout) {
       branch,
       commitSha
     }, {
-      timeout: timeout,
       headers: {
         'accept': 'text/plain',
         'Content-Type': 'application/json',
@@ -40583,82 +40575,6 @@ async function createBuild(apiBaseUrl, projectId, branch, commitSha, timeout) {
 }
 
 /**
- * Poll the build status endpoint
- */
-async function pollBuildStatus(apiBaseUrl, projectId, buildId, pollingInterval, maxAttempts, timeout) {
-  let attempts = 0;
-  let lastResponse = { status: 'unknown', message: 'No response received' };
-  
-  const endpoint = `${apiBaseUrl}/projects/${projectId}/builds/${buildId}`;
-  
-  core.info(`Starting polling with interval: ${pollingInterval}s, max attempts: ${maxAttempts}`);
-  
-  while (attempts < maxAttempts) {
-    try {
-      core.info(`Polling attempt ${attempts + 1}/${maxAttempts}`);
-      
-      const response = await axios.get(endpoint, {
-        timeout: timeout,
-        headers: {
-          'accept': 'text/plain',
-          'User-Agent': 'embr-action'
-        }
-      });
-      
-      lastResponse = response.data;
-      core.info(`Poll response: ${JSON.stringify(response.data)}`);
-      
-      // Check if build is complete
-      if (response.data.status === 'completed' || 
-          response.data.status === 'success' || 
-          response.data.status === 'succeeded' ||
-          response.data.complete === true) {
-        core.info('Build completed successfully!');
-        return {
-          status: 'completed',
-          response: response.data
-        };
-      }
-      
-      // Check if build has failed
-      if (response.data.status === 'failed' || 
-          response.data.status === 'error') {
-        core.warning('Build reported failure status');
-        return {
-          status: 'failed',
-          response: response.data
-        };
-      }
-      
-      // Continue polling
-      core.info(`Build still in progress... waiting ${pollingInterval}s before next attempt`);
-      attempts++;
-      
-      if (attempts < maxAttempts) {
-        await sleep(pollingInterval * 1000);
-      }
-      
-    } catch (error) {
-      core.warning(`Polling attempt failed: ${error.message}`);
-      
-      // Only continue if we have attempts left
-      if (attempts + 1 < maxAttempts) {
-        core.info(`Waiting ${pollingInterval}s before retry...`);
-        await sleep(pollingInterval * 1000);
-      }
-      attempts++;
-    }
-  }
-  
-  // Max attempts reached
-  core.warning(`Max polling attempts (${maxAttempts}) reached`);
-  return {
-    status: 'timeout',
-    response: lastResponse
-  };
-}
-
-/**
  * Main action entry point
  */
 async function run() {
@@ -40666,10 +40582,9 @@ async function run() {
     // Get inputs
     const projectId = core.getInput('project-id', { required: true });
     const apiBaseUrl = core.getInput('api-base-url') || 'https://embr-poc.azurewebsites.net/api';
-    const pollingInterval = parseInt(core.getInput('polling-interval') || '10', 10);
-    const maxAttempts = parseInt(core.getInput('max-attempts') || '30', 10);
-    const timeout = parseInt(core.getInput('timeout') || '30000', 10);
     
+    core.info('='.repeat(50));
+    core.info('🔥 Welcome to Embr!');
     core.info('='.repeat(50));
     core.info('Embr Action Started');
     core.info('='.repeat(50));
@@ -40697,94 +40612,22 @@ async function run() {
     
     // Create build
     core.info('='.repeat(50));
-    core.info('Step 1: Creating build');
+    core.info('Creating build');
     core.info('='.repeat(50));
     const buildResponse = await createBuild(
       apiBaseUrl,
       projectId,
       branchName,
-      repoContext.commit,
-      timeout
-    );
-    
-    // Check if build response includes an ID for polling
-    let buildId = buildResponse.id || buildResponse.buildId || buildResponse.build_id;
-    
-    if (buildId) {
-      core.info(`Build created with ID: ${buildId}`);
-    } else {
-      core.info('No build ID returned in response');
-      
-      // Check if the response indicates immediate success
-      if (buildResponse.status === 'completed' || 
-          buildResponse.status === 'success' || 
-          buildResponse.status === 'succeeded' ||
-          buildResponse.complete === true) {
-        core.info('Build completed immediately (no polling needed)');
-        core.setOutput('status', 'completed');
-        core.setOutput('response', JSON.stringify(buildResponse));
-        core.info('Action completed successfully!');
-        return;
-      }
-      
-      // No build ID and not immediately successful - treat as completed but log warning
-      core.warning('Build response does not contain an ID or clear success status. Assuming completed.');
-      core.setOutput('status', 'completed');
-      core.setOutput('response', JSON.stringify(buildResponse));
-      return;
-    }
-    
-    // Check if build completed immediately
-    if (buildResponse.status === 'completed' || 
-        buildResponse.status === 'success' || 
-        buildResponse.status === 'succeeded' ||
-        buildResponse.complete === true) {
-      core.info('Build completed immediately!');
-      core.setOutput('status', 'completed');
-      core.setOutput('response', JSON.stringify(buildResponse));
-      core.info('Action completed successfully!');
-      return;
-    }
-    
-    // Check if build failed immediately
-    if (buildResponse.status === 'failed' || 
-        buildResponse.status === 'error') {
-      core.warning('Build failed immediately');
-      core.setOutput('status', 'failed');
-      core.setOutput('response', JSON.stringify(buildResponse));
-      core.setFailed('Build execution failed');
-      return;
-    }
-    
-    // Start polling for build status
-    core.info('='.repeat(50));
-    core.info('Step 2: Polling build status');
-    core.info('='.repeat(50));
-    const pollResult = await pollBuildStatus(
-      apiBaseUrl,
-      projectId,
-      buildId,
-      pollingInterval,
-      maxAttempts,
-      timeout
+      repoContext.commit
     );
     
     // Set outputs
-    core.setOutput('status', pollResult.status);
-    core.setOutput('response', JSON.stringify(pollResult.response));
+    core.setOutput('status', 'completed');
+    core.setOutput('response', JSON.stringify(buildResponse));
     
-    // Log final status
     core.info('='.repeat(50));
-    core.info(`Final Status: ${pollResult.status}`);
+    core.info('Action completed successfully!');
     core.info('='.repeat(50));
-    
-    if (pollResult.status === 'failed') {
-      core.setFailed('Build execution failed');
-    } else if (pollResult.status === 'timeout') {
-      core.setFailed('Build execution timed out');
-    } else {
-      core.info('Action completed successfully!');
-    }
     
   } catch (error) {
     core.setFailed(`Action failed: ${error.message}`);
