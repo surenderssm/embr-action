@@ -48,19 +48,23 @@ function getRepositoryContext() {
 }
 
 /**
- * Call the endpoint with repository context
+ * Call the Embr API to create a build
  */
-async function callEndpoint(endpoint, repoContext, timeout) {
+async function createBuild(apiBaseUrl, projectId, branch, commitSha, timeout) {
   try {
-    core.info(`Calling endpoint: ${endpoint}`);
-    core.info(`Repository context: ${JSON.stringify(repoContext, null, 2)}`);
+    const endpoint = `${apiBaseUrl}/projects/${projectId}/builds`;
+    
+    core.info(`Creating build at: ${endpoint}`);
+    core.info(`Branch: ${branch}`);
+    core.info(`Commit SHA: ${commitSha}`);
     
     const response = await axios.post(endpoint, {
-      ...repoContext,
-      timestamp: new Date().toISOString()
+      branch: branch,
+      commitSha: commitSha
     }, {
       timeout: timeout,
       headers: {
+        'accept': 'text/plain',
         'Content-Type': 'application/json',
         'User-Agent': 'embr-action'
       }
@@ -84,11 +88,13 @@ async function callEndpoint(endpoint, repoContext, timeout) {
 }
 
 /**
- * Poll the endpoint for status updates
+ * Poll the build status endpoint
  */
-async function pollEndpoint(endpoint, repoContext, pollingInterval, maxAttempts, timeout) {
+async function pollBuildStatus(apiBaseUrl, projectId, buildId, pollingInterval, maxAttempts, timeout) {
   let attempts = 0;
   let lastResponse = { status: 'unknown', message: 'No response received' };
+  
+  const endpoint = `${apiBaseUrl}/projects/${projectId}/builds/${buildId}`;
   
   core.info(`Starting polling with interval: ${pollingInterval}s, max attempts: ${maxAttempts}`);
   
@@ -98,12 +104,8 @@ async function pollEndpoint(endpoint, repoContext, pollingInterval, maxAttempts,
       
       const response = await axios.get(endpoint, {
         timeout: timeout,
-        params: {
-          repository: repoContext.fullRepository,
-          commit: repoContext.commit,
-          runId: repoContext.runId
-        },
         headers: {
+          'accept': 'text/plain',
           'User-Agent': 'embr-action'
         }
       });
@@ -111,22 +113,22 @@ async function pollEndpoint(endpoint, repoContext, pollingInterval, maxAttempts,
       lastResponse = response.data;
       core.info(`Poll response: ${JSON.stringify(response.data)}`);
       
-      // Check if task is complete
-      // Assuming the endpoint returns a status field
+      // Check if build is complete
       if (response.data.status === 'completed' || 
           response.data.status === 'success' || 
+          response.data.status === 'succeeded' ||
           response.data.complete === true) {
-        core.info('Task completed successfully!');
+        core.info('Build completed successfully!');
         return {
           status: 'completed',
           response: response.data
         };
       }
       
-      // Check if task has failed
+      // Check if build has failed
       if (response.data.status === 'failed' || 
           response.data.status === 'error') {
-        core.warning('Task reported failure status');
+        core.warning('Build reported failure status');
         return {
           status: 'failed',
           response: response.data
@@ -134,7 +136,7 @@ async function pollEndpoint(endpoint, repoContext, pollingInterval, maxAttempts,
       }
       
       // Continue polling
-      core.info(`Task still in progress... waiting ${pollingInterval}s before next attempt`);
+      core.info(`Build still in progress... waiting ${pollingInterval}s before next attempt`);
       attempts++;
       
       if (attempts < maxAttempts) {
@@ -167,7 +169,8 @@ async function pollEndpoint(endpoint, repoContext, pollingInterval, maxAttempts,
 async function run() {
   try {
     // Get inputs
-    const endpoint = core.getInput('endpoint', { required: true });
+    const projectId = core.getInput('project-id', { required: true });
+    const apiBaseUrl = core.getInput('api-base-url') || 'https://embr-poc.azurewebsites.net/api';
     const pollingInterval = parseInt(core.getInput('polling-interval') || '10', 10);
     const maxAttempts = parseInt(core.getInput('max-attempts') || '30', 10);
     const timeout = parseInt(core.getInput('timeout') || '30000', 10);
@@ -186,41 +189,70 @@ async function run() {
     core.info(`Actor: ${repoContext.actor}`);
     core.info(`Event: ${repoContext.eventName}`);
     core.info(`Run ID: ${repoContext.runId}`);
+    core.info(`Project ID: ${projectId}`);
     
-    // Call the endpoint initially
-    core.info('='.repeat(50));
-    core.info('Step 1: Calling endpoint');
-    core.info('='.repeat(50));
-    const initialResponse = await callEndpoint(endpoint, repoContext, timeout);
+    // Determine branch name to use
+    let branchName = repoContext.branch || repoContext.ref;
+    if (!branchName || branchName === 'unknown') {
+      core.warning('Could not determine branch name, using commit SHA as fallback');
+      branchName = repoContext.commit;
+    }
     
-    // Check if task completed immediately
-    if (initialResponse.status === 'completed' || 
-        initialResponse.status === 'success' || 
-        initialResponse.complete === true) {
-      core.info('Task completed immediately!');
+    // Create build
+    core.info('='.repeat(50));
+    core.info('Step 1: Creating build');
+    core.info('='.repeat(50));
+    const buildResponse = await createBuild(
+      apiBaseUrl,
+      projectId,
+      branchName,
+      repoContext.commit,
+      timeout
+    );
+    
+    // Check if build response includes an ID for polling
+    let buildId = buildResponse.id || buildResponse.buildId || buildResponse.build_id;
+    
+    if (!buildId) {
+      core.info('No build ID returned, setting outputs and completing');
       core.setOutput('status', 'completed');
-      core.setOutput('response', JSON.stringify(initialResponse));
+      core.setOutput('response', JSON.stringify(buildResponse));
       core.info('Action completed successfully!');
       return;
     }
     
-    // Check if task failed immediately
-    if (initialResponse.status === 'failed' || 
-        initialResponse.status === 'error') {
-      core.warning('Task failed immediately');
-      core.setOutput('status', 'failed');
-      core.setOutput('response', JSON.stringify(initialResponse));
-      core.setFailed('Task execution failed');
+    core.info(`Build created with ID: ${buildId}`);
+    
+    // Check if build completed immediately
+    if (buildResponse.status === 'completed' || 
+        buildResponse.status === 'success' || 
+        buildResponse.status === 'succeeded' ||
+        buildResponse.complete === true) {
+      core.info('Build completed immediately!');
+      core.setOutput('status', 'completed');
+      core.setOutput('response', JSON.stringify(buildResponse));
+      core.info('Action completed successfully!');
       return;
     }
     
-    // Start polling
+    // Check if build failed immediately
+    if (buildResponse.status === 'failed' || 
+        buildResponse.status === 'error') {
+      core.warning('Build failed immediately');
+      core.setOutput('status', 'failed');
+      core.setOutput('response', JSON.stringify(buildResponse));
+      core.setFailed('Build execution failed');
+      return;
+    }
+    
+    // Start polling for build status
     core.info('='.repeat(50));
-    core.info('Step 2: Starting polling');
+    core.info('Step 2: Polling build status');
     core.info('='.repeat(50));
-    const pollResult = await pollEndpoint(
-      endpoint,
-      repoContext,
+    const pollResult = await pollBuildStatus(
+      apiBaseUrl,
+      projectId,
+      buildId,
       pollingInterval,
       maxAttempts,
       timeout
@@ -236,9 +268,9 @@ async function run() {
     core.info('='.repeat(50));
     
     if (pollResult.status === 'failed') {
-      core.setFailed('Task execution failed');
+      core.setFailed('Build execution failed');
     } else if (pollResult.status === 'timeout') {
-      core.setFailed('Task execution timed out');
+      core.setFailed('Build execution timed out');
     } else {
       core.info('Action completed successfully!');
     }

@@ -1,12 +1,13 @@
 # Embr Action
 
-A GitHub Action that calls an endpoint with repository context (repository name, branch, commit details) and continuously polls for task completion.
+A GitHub Action that creates Embr builds with automatically captured branch and commit information. Simply provide your project ID, and the action handles the rest.
 
 ## Features
 
-- 📡 **Endpoint Integration**: Calls a specified endpoint with full repository context
-- 🔄 **Automatic Polling**: Continuously polls the endpoint to check task status
-- 📊 **Rich Context**: Provides repository name, branch, commit SHA, actor, and workflow information
+- 🎯 **Simple Configuration**: Only requires project ID - branch and commit are auto-captured
+- 📡 **Embr API Integration**: Directly integrates with Embr build API
+- 🔄 **Automatic Polling**: Continuously polls for build completion status
+- 📊 **Rich Context**: Automatically captures branch name and commit SHA from GitHub
 - ⚙️ **Configurable**: Customizable polling interval, retry limits, and timeouts
 - 🎯 **Smart Status Detection**: Automatically detects completion, failure, or timeout states
 
@@ -15,57 +16,58 @@ A GitHub Action that calls an endpoint with repository context (repository name,
 ### Basic Example
 
 ```yaml
-name: Embr Task Workflow
+name: Embr Build Workflow
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  embr-task:
+  embr-build:
     runs-on: ubuntu-latest
     steps:
-      - name: Run Embr Action
+      - name: Trigger Embr Build
         uses: surenderssm/embr-action@v1
         with:
-          endpoint: 'https://api.example.com/task'
+          project-id: 'c53f464b-6c5c-49ec-8212-fc1c26129bac'
 ```
 
 ### Advanced Example
 
 ```yaml
-name: Embr Task Workflow
+name: Embr Build Workflow
 
 on:
   push:
     branches: [ main, develop ]
 
 jobs:
-  embr-task:
+  embr-build:
     runs-on: ubuntu-latest
     steps:
-      - name: Run Embr Action with custom settings
+      - name: Trigger Embr Build with custom settings
         id: embr
         uses: surenderssm/embr-action@v1
         with:
-          endpoint: 'https://api.example.com/task'
+          project-id: 'c53f464b-6c5c-49ec-8212-fc1c26129bac'
           polling-interval: '15'
           max-attempts: '20'
           timeout: '45000'
         
-      - name: Check task result
+      - name: Check build result
         run: |
-          echo "Task Status: ${{ steps.embr.outputs.status }}"
-          echo "Task Response: ${{ steps.embr.outputs.response }}"
+          echo "Build Status: ${{ steps.embr.outputs.status }}"
+          echo "Build Response: ${{ steps.embr.outputs.response }}"
 ```
 
 ## Inputs
 
 | Input | Description | Required | Default |
 |-------|-------------|----------|---------|
-| `endpoint` | The endpoint URL to call and poll | Yes | - |
+| `project-id` | The Embr project ID | Yes | - |
+| `api-base-url` | The API base URL | No | `https://embr-poc.azurewebsites.net/api` |
 | `polling-interval` | Polling interval in seconds | No | `10` |
 | `max-attempts` | Maximum number of polling attempts | No | `30` |
 | `timeout` | Timeout for each HTTP request in milliseconds | No | `30000` |
@@ -74,107 +76,148 @@ jobs:
 
 | Output | Description |
 |--------|-------------|
-| `status` | Status of the task execution (`completed`, `failed`, or `timeout`) |
-| `response` | JSON response from the endpoint |
-
-## Repository Context
-
-The action automatically captures and sends the following context to your endpoint:
-
-```json
-{
-  "repository": "embr-action",
-  "owner": "surenderssm",
-  "fullRepository": "surenderssm/embr-action",
-  "ref": "main",
-  "refType": "branch",
-  "branch": "main",
-  "tag": null,
-  "commit": "abc123def456...",
-  "actor": "username",
-  "workflow": "Embr Task Workflow",
-  "eventName": "push",
-  "runId": "123456789",
-  "runNumber": "42",
-  "timestamp": "2026-01-29T07:00:00.000Z"
-}
-```
-
-## Endpoint Requirements
-
-Your endpoint should:
-
-1. **Initial POST Request**: Accept a POST request with the repository context
-2. **Polling GET Requests**: Respond to GET requests with query parameters:
-   - `repository`: Full repository name (e.g., `owner/repo`)
-   - `commit`: Commit SHA
-   - `runId`: GitHub Actions run ID
-
-3. **Status Response**: Return a JSON response with a status field:
-   ```json
-   {
-     "status": "completed|success|failed|error|in_progress",
-     "complete": true|false,
-     "message": "Optional status message",
-     "data": {}
-   }
-   ```
-
-### Status Values
-
-- `completed` or `success`: Task finished successfully
-- `failed` or `error`: Task encountered an error
-- `in_progress` or other values: Task is still running (continue polling)
+| `status` | Status of the build execution (`completed`, `failed`, or `timeout`) |
+| `response` | JSON response from the Embr API |
 
 ## How It Works
 
-1. **Initialization**: The action gathers repository context (name, branch, commit, etc.)
-2. **Initial Call**: Makes a POST request to the endpoint with all context data
-3. **Polling Loop**: 
-   - Makes GET requests to check task status
-   - Waits for the specified polling interval between attempts
-   - Continues until task completes, fails, or max retries is reached
-4. **Completion**: Sets output values and exits with appropriate status
+1. **Capture Context**: The action automatically captures the current branch name and commit SHA from GitHub
+2. **Create Build**: Makes a POST request to `https://embr-poc.azurewebsites.net/api/projects/{project-id}/builds` with:
+   ```json
+   {
+     "branch": "main",
+     "commitSha": "abc123def456..."
+   }
+   ```
+3. **Poll Status**: If a build ID is returned, polls the build status endpoint until completion
+4. **Report Results**: Sets outputs with final status and response data
 
-## Example Endpoint Implementation
+## API Endpoint
 
-Here's a simple Node.js Express example:
+The action calls the following Embr API endpoint:
 
-```javascript
-const express = require('express');
-const app = express();
+**POST** `https://embr-poc.azurewebsites.net/api/projects/{project-id}/builds`
 
-app.use(express.json());
+**Request Headers:**
+- `accept: text/plain`
+- `Content-Type: application/json`
 
-// Store task status
-const tasks = {};
+**Request Body:**
+```json
+{
+  "branch": "branch-name",
+  "commitSha": "commit-sha-value"
+}
+```
 
-// Receive initial task
-app.post('/task', (req, res) => {
-  const { fullRepository, commit, runId } = req.body;
-  const taskId = `${fullRepository}-${commit}-${runId}`;
+## Branch Detection
+
+The action intelligently detects the branch name:
+- For branch pushes: uses the branch name (e.g., `main`, `develop`)
+- For tags: uses the tag name
+- For pull requests: uses the PR reference
+- Fallback: uses the commit SHA if branch cannot be determined
+
+## Example with Multiple Jobs
+
+```yaml
+name: Embr Multi-Environment Build
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dev Build
+        uses: surenderssm/embr-action@v1
+        with:
+          project-id: 'dev-project-id'
   
-  // Initialize task
-  tasks[taskId] = { status: 'in_progress', data: req.body };
-  
-  // Simulate async processing
-  setTimeout(() => {
-    tasks[taskId].status = 'completed';
-  }, 30000); // Complete after 30 seconds
-  
-  res.json({ taskId, status: 'accepted' });
-});
+  build-prod:
+    runs-on: ubuntu-latest
+    needs: build-dev
+    steps:
+      - name: Trigger Production Build
+        uses: surenderssm/embr-action@v1
+        with:
+          project-id: 'prod-project-id'
+```
 
-// Poll for status
-app.get('/task', (req, res) => {
-  const { repository, commit, runId } = req.query;
-  const taskId = `${repository}-${commit}-${runId}`;
-  
-  const task = tasks[taskId] || { status: 'not_found' };
-  res.json(task);
-});
+## Outputs
 
-app.listen(3000);
+| Output | Description |
+|--------|-------------|
+| `status` | Status of the build execution (`completed`, `failed`, or `timeout`) |
+| `response` | JSON response from the Embr API |
+
+## How It Works
+
+1. **Capture Context**: The action automatically captures the current branch name and commit SHA from GitHub
+2. **Create Build**: Makes a POST request to `https://embr-poc.azurewebsites.net/api/projects/{project-id}/builds` with:
+   ```json
+   {
+     "branch": "main",
+     "commitSha": "abc123def456..."
+   }
+   ```
+3. **Poll Status**: If a build ID is returned, polls the build status endpoint until completion
+4. **Report Results**: Sets outputs with final status and response data
+
+## API Endpoint
+
+The action calls the following Embr API endpoint:
+
+**POST** `https://embr-poc.azurewebsites.net/api/projects/{project-id}/builds`
+
+**Request Headers:**
+- `accept: text/plain`
+- `Content-Type: application/json`
+
+**Request Body:**
+```json
+{
+  "branch": "branch-name",
+  "commitSha": "commit-sha-value"
+}
+```
+
+## Branch Detection
+
+The action intelligently detects the branch name:
+- For branch pushes: uses the branch name (e.g., `main`, `develop`)
+- For tags: uses the tag name
+- For pull requests: uses the PR reference
+- Fallback: uses the commit SHA if branch cannot be determined
+
+## Example with Multiple Jobs
+
+```yaml
+name: Embr Multi-Environment Build
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dev Build
+        uses: surenderssm/embr-action@v1
+        with:
+          project-id: 'dev-project-id'
+  
+  build-prod:
+    runs-on: ubuntu-latest
+    needs: build-dev
+    steps:
+      - name: Trigger Production Build
+        uses: surenderssm/embr-action@v1
+        with:
+          project-id: 'prod-project-id'
 ```
 
 ## Development
@@ -190,20 +233,6 @@ npm run build
 ```
 
 The build process uses `@vercel/ncc` to compile the action and its dependencies into a single file in the `dist` directory.
-
-### Testing Locally
-
-To test the action locally, you can set environment variables and run the script:
-
-```bash
-export INPUT_ENDPOINT="https://api.example.com/task"
-export INPUT_POLLING_INTERVAL="5"
-export GITHUB_REPOSITORY="owner/repo"
-export GITHUB_REF="refs/heads/main"
-export GITHUB_SHA="abc123"
-
-node src/index.js
-```
 
 ## License
 

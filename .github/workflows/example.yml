@@ -1,4 +1,4 @@
-name: Example Embr Workflow
+name: Example Embr Build Workflow
 
 on:
   push:
@@ -8,27 +8,22 @@ on:
   workflow_dispatch:
 
 jobs:
-  embr-task:
+  embr-build:
     runs-on: ubuntu-latest
-    name: Run Embr Action Example
+    name: Trigger Embr Build
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Run Embr Action
+      - name: Trigger Embr Build
         id: embr
         uses: ./
         with:
-          # Note: This example uses httpbin.org which will demonstrate
-          # the initial POST call but polling will timeout since httpbin
-          # doesn't maintain state. Replace with your actual endpoint.
-          endpoint: 'https://httpbin.org/anything'
-          polling-interval: '5'
-          max-attempts: '3'
+          # Replace with your actual project ID
+          project-id: 'c53f464b-6c5c-49ec-8212-fc1c26129bac'
+          polling-interval: '10'
+          max-attempts: '5'
           timeout: '10000'
       
       - name: Display Results
         if: always()
         run: |
-          echo "Task Status: ${{ steps.embr.outputs.status }}"
-          echo "Task Response: ${{ steps.embr.outputs.response }}"
+          echo "Build Status: ${{ steps.embr.outputs.status }}"
+          echo "Build Response: ${{ steps.embr.outputs.response }}"

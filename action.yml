@@ -3,9 +3,13 @@ description: 'GitHub Action that calls an endpoint and polls for completion with
 author: 'surenderssm'
 
 inputs:
-  endpoint:
-    description: 'The endpoint URL to call'
+  project-id:
+    description: 'The Embr project ID'
     required: true
+  api-base-url:
+    description: 'The API base URL (default: https://embr-poc.azurewebsites.net/api)'
+    required: false
+    default: 'https://embr-poc.azurewebsites.net/api'
   polling-interval:
     description: 'Polling interval in seconds (default: 10)'
     required: false
