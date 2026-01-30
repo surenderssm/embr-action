@@ -1,0 +1,44 @@
+name: Example Embr Upload Workflow
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    name: Build and Upload to Embr
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+          
+      - name: Create zip artifact
+        run: zip -r build.zip . -x ".git/*" -x ".github/*"
+        
+      - name: Upload to Embr
+        id: embr
+        uses: ./
+        with:
+          mode: 'upload'
+          # Replace with your actual project ID
+          project-id: 'prj_34068def840b498f8a969202b58875d5'
+          # Replace with your actual environment ID
+          environment-id: 'env_dea58c64d13246569c1c707d94cad976'
+          zip-file: 'build.zip'
+      
+      - name: Display Results
+        if: always()
+        run: |
+          echo "Build Status: ${{ steps.embr.outputs.status }}"
+          echo "Build ID: ${{ steps.embr.outputs.build-id }}"
+          echo "Deployment URL: ${{ steps.embr.outputs.deployment-url }}"
+          echo "Build Response: ${{ steps.embr.outputs.response }}"

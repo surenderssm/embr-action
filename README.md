@@ -61,11 +61,54 @@ jobs:
           echo "Deployment URL: ${{ steps.embr.outputs.deployment-url }}"
 ```
 
+### Upload Mode Example
+
+```yaml
+name: Embr Upload Workflow
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Build your app
+        run: |
+          # Your build steps here
+          npm install && npm run build
+          
+      - name: Create zip artifact
+        run: zip -r build.zip ./dist
+        
+      - name: Upload to Embr
+        id: embr
+        uses: surenderssm/embr-action@main
+        with:
+          mode: 'upload'
+          project-id: 'your-project-id'
+          environment-id: 'your-environment-id'
+          zip-file: 'build.zip'
+        
+      - name: Show results
+        run: |
+          echo "Status: ${{ steps.embr.outputs.status }}"
+          echo "Deployment URL: ${{ steps.embr.outputs.deployment-url }}"
+```
+
 ## Inputs
 
-| Input | Description | Required |
-|-------|-------------|----------|
-| `project-id` | The Embr project ID | Yes |
+| Input | Description | Required | Default |
+|-------|-------------|----------|---------|
+| `mode` | Action mode: `build` or `upload` | No | `build` |
+| `project-id` | The Embr project ID | Yes | - |
+| `environment-id` | The Embr environment ID (required for upload mode) | No | - |
+| `zip-file` | Path to the zip file to upload (required for upload mode) | No | - |
+| `api-base-url` | Base URL for the Embr API | No | `https://embr-poc.azurewebsites.net/api` |
 
 ## Outputs
 

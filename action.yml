@@ -3,9 +3,23 @@ description: 'GitHub Action that creates Embr builds with auto-captured branch a
 author: 'surenderssm'
 
 inputs:
+  mode:
+    description: 'Action mode: "build" (create build from branch/commit) or "upload" (upload zip file)'
+    required: false
+    default: 'build'
   project-id:
     description: 'The Embr project ID'
     required: true
+  environment-id:
+    description: 'The Embr environment ID (required for upload mode)'
+    required: false
+  zip-file:
+    description: 'Path to the zip file to upload (required for upload mode)'
+    required: false
+  api-base-url:
+    description: 'Base URL for the Embr API'
+    required: false
+    default: 'https://embr-poc.azurewebsites.net/api'
 
 outputs:
   status:
